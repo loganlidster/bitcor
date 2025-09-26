@@ -1,7 +1,7 @@
 name: infra
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch: {}         # allow manual runs
   push:
     branches: [ main ]
     paths:
@@ -9,7 +9,7 @@ on:
       - '.github/workflows/infra.yml'
 
 permissions:
-  id-token: write
+  id-token: write               # needed for OIDC
   contents: read
 
 jobs:
@@ -43,13 +43,32 @@ jobs:
       - name: Terraform Init (backend via flags)
         working-directory: infra/terraform
         run: |
-          terraform init -input=false             -backend-config="bucket=${TF_STATE_BUCKET}"             -backend-config="key=global/terraform.tfstate"             -backend-config="region=${AWS_REGION}"             -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}"             -backend-config="encrypt=true"
+          terraform init -input=false \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=global/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
+            -backend-config="encrypt=true"
+
+      # --------------------------------------------------------------------
+      # If you hit a stale state-lock error, UNCOMMENT the 3 lines below,
+      # paste the Lock ID from the error, commit, run once, then re-comment.
+      #
+      # - name: Force unlock state (one-time only)
+      #   working-directory: infra/terraform
+      #   run: terraform force-unlock -force cfbf456d-b6e3-2b69-8b19-b0556ba5b45c
+      # --------------------------------------------------------------------
 
       - name: Terraform Validate
         working-directory: infra/terraform
         run: terraform validate
 
-      - name: Terraform Apply (push to main or manual run on main)
+      - name: Terraform Plan (optional info in logs)
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         working-directory: infra/terraform
-        run: terraform apply -input=false -auto-approve
+        run: terraform plan -input=false -lock-timeout=5m
+
+      - name: Terraform Apply
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        working-directory: infra/terraform
+        run: terraform apply -input=false -lock-timeout=5m -auto-approve
