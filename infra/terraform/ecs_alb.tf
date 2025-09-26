@@ -12,8 +12,7 @@ variable "aws_region" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix  = var.project_name
-  cluster_name = "bitcor-cluster"
+  # Do NOT define name_prefix here (avoids duplicate with vpc.tf)
   api_name     = "${var.project_name}-api"
   engine_name  = "${var.project_name}-engine"
   api_port     = 8080
@@ -28,7 +27,8 @@ locals {
 ####################
 
 resource "aws_iam_role" "ecs_task_execution" {
-  name = "${local.name_prefix}-ecs-task-exec"
+  name = "${var.project_name}-ecs-task-exec"
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -37,7 +37,11 @@ resource "aws_iam_role" "ecs_task_execution" {
       Action = "sts:AssumeRole"
     }]
   })
-  tags = { Project = var.project_name, Environment = "prod" }
+
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy" {
@@ -46,7 +50,8 @@ resource "aws_iam_role_policy_attachment" "ecs_task_exec_policy" {
 }
 
 resource "aws_iam_role" "ecs_task_role" {
-  name = "${local.name_prefix}-ecs-task-role"
+  name = "${var.project_name}-ecs-task-role"
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
@@ -55,7 +60,11 @@ resource "aws_iam_role" "ecs_task_role" {
       Action = "sts:AssumeRole"
     }]
   })
-  tags = { Project = var.project_name, Environment = "prod" }
+
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 ####################
@@ -63,20 +72,24 @@ resource "aws_iam_role" "ecs_task_role" {
 ####################
 
 resource "aws_lb" "api" {
-  name               = "${local.name_prefix}-alb"
+  name               = "${var.project_name}-alb"
   load_balancer_type = "application"
   internal           = false
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = aws_subnet.public[*].id
-  tags               = { Project = var.project_name, Environment = "prod" }
+
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 resource "aws_lb_target_group" "api" {
-  name        = "${local.name_prefix}-tg"
+  name        = "${var.project_name}-tg"
   port        = local.api_port
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
-  target_type = "ip"                    # <-- REQUIRED for Fargate/awsvpc
+  target_type = "ip"  # REQUIRED for Fargate/awsvpc
 
   health_check {
     path                = "/healthz"
@@ -87,7 +100,10 @@ resource "aws_lb_target_group" "api" {
     matcher             = "200"
   }
 
-  tags = { Project = var.project_name, Environment = "prod" }
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 resource "aws_lb_listener" "http" {
@@ -102,20 +118,30 @@ resource "aws_lb_listener" "http" {
 }
 
 ##########################
-# Task Definitions
+# CloudWatch Logs
 ##########################
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/${local.api_name}"
   retention_in_days = 7
-  tags              = { Project = var.project_name, Environment = "prod" }
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 resource "aws_cloudwatch_log_group" "engine" {
   name              = "/ecs/${local.engine_name}"
   retention_in_days = 7
-  tags              = { Project = var.project_name, Environment = "prod" }
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
+
+##########################
+# Task Definitions
+##########################
 
 resource "aws_ecs_task_definition" "api" {
   family                   = "${local.api_name}-td"
@@ -154,7 +180,10 @@ resource "aws_ecs_task_definition" "api" {
     }
   ])
 
-  tags = { Project = var.project_name, Environment = "prod" }
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 resource "aws_ecs_task_definition" "engine" {
@@ -182,7 +211,10 @@ resource "aws_ecs_task_definition" "engine" {
     }
   ])
 
-  tags = { Project = var.project_name, Environment = "prod" }
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 ##########################
@@ -209,7 +241,11 @@ resource "aws_ecs_service" "api" {
   }
 
   depends_on = [aws_lb_listener.http]
-  tags       = { Project = var.project_name, Environment = "prod" }
+
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 resource "aws_ecs_service" "engine" {
@@ -225,7 +261,10 @@ resource "aws_ecs_service" "engine" {
     assign_public_ip = false
   }
 
-  tags = { Project = var.project_name, Environment = "prod" }
+  tags = {
+    Project     = var.project_name
+    Environment = "prod"
+  }
 }
 
 ##########################
