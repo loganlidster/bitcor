@@ -12,6 +12,7 @@ variable "aws_region" {
 data "aws_caller_identity" "current" {}
 
 locals {
+  name_prefix  = var.project_name
   cluster_name = "bitcor-cluster"
   api_name     = "${var.project_name}-api"
   engine_name  = "${var.project_name}-engine"
@@ -21,7 +22,6 @@ locals {
   api_image    = "${local.ecr_registry}/v7-api:latest"
   engine_image = "${local.ecr_registry}/v7-engine:latest"
 }
-
 
 ####################
 # IAM Roles
@@ -72,10 +72,11 @@ resource "aws_lb" "api" {
 }
 
 resource "aws_lb_target_group" "api" {
-  name     = "${local.name_prefix}-tg"
-  port     = local.api_port
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
+  name        = "${local.name_prefix}-tg"
+  port        = local.api_port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"                    # <-- REQUIRED for Fargate/awsvpc
 
   health_check {
     path                = "/healthz"
@@ -127,26 +128,26 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name      = local.api_name
-      image     = local.api_image
-      essential = true
+      name      = local.api_name,
+      image     = local.api_image,
+      essential = true,
       portMappings = [{
-        containerPort = local.api_port
-        hostPort      = local.api_port
+        containerPort = local.api_port,
+        hostPort      = local.api_port,
         protocol      = "tcp"
-      }]
+      }],
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"],
+        interval    = 30,
+        timeout     = 5,
+        retries     = 3,
         startPeriod = 10
-      }
+      },
       logConfiguration = {
-        logDriver = "awslogs"
+        logDriver = "awslogs",
         options = {
-          awslogs-region        = var.aws_region
-          awslogs-group         = "/ecs/${local.api_name}"
+          awslogs-region        = var.aws_region,
+          awslogs-group         = "/ecs/${local.api_name}",
           awslogs-stream-prefix = "ecs"
         }
       }
@@ -167,14 +168,14 @@ resource "aws_ecs_task_definition" "engine" {
 
   container_definitions = jsonencode([
     {
-      name      = local.engine_name
-      image     = local.engine_image
-      essential = true
+      name      = local.engine_name,
+      image     = local.engine_image,
+      essential = true,
       logConfiguration = {
-        logDriver = "awslogs"
+        logDriver = "awslogs",
         options = {
-          awslogs-region        = var.aws_region
-          awslogs-group         = "/ecs/${local.engine_name}"
+          awslogs-region        = var.aws_region,
+          awslogs-group         = "/ecs/${local.engine_name}",
           awslogs-stream-prefix = "ecs"
         }
       }
@@ -196,8 +197,8 @@ resource "aws_ecs_service" "api" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs_sg.id]
     assign_public_ip = false
   }
 
@@ -219,8 +220,8 @@ resource "aws_ecs_service" "engine" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ecs_sg.id]
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs_sg.id]
     assign_public_ip = false
   }
 
