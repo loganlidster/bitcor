@@ -8,7 +8,6 @@ terraform {
     }
   }
 
-  # Empty backend; values injected by workflow (-backend-config flags)
   backend "s3" {}
 }
 
@@ -19,8 +18,6 @@ variable "project_name" {
   default     = "bitcor"
   description = "Project name for tagging"
 }
-
-# Minimal infra so you can see resources immediately
 
 resource "aws_ecr_repository" "api" {
   name                 = "v7-api"

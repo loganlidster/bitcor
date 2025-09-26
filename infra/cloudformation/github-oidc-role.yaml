@@ -16,7 +16,7 @@ Parameters:
     Default: main
   TfStateBucketName:
     Type: String
-    Description: Globally unique S3 bucket name for Terraform state (e.g., bitcor-tfstate-123abc)
+    Description: Globally unique S3 bucket name for Terraform state (e.g., bitcor-tfstate-546929127780-usw1)
   TfStateLockTableName:
     Type: String
     Default: tf-state-lock-table
@@ -26,17 +26,14 @@ Resources:
     Type: AWS::IAM::OIDCProvider
     Properties:
       Url: https://token.actions.githubusercontent.com
-      ClientIdList:
-        - sts.amazonaws.com
-      ThumbprintList:
-        - 6938fd4d98bab03faadb97b34396831e3780aea1
+      ClientIdList: [ sts.amazonaws.com ]
+      ThumbprintList: [ 6938fd4d98bab03faadb97b34396831e3780aea1 ]
 
   TfStateBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref TfStateBucketName
-      VersioningConfiguration:
-        Status: Enabled
+      VersioningConfiguration: { Status: Enabled }
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -44,20 +41,15 @@ Resources:
         RestrictPublicBuckets: true
       BucketEncryption:
         ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
 
   TfStateLockTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Ref TfStateLockTableName
       BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: LockID
-          AttributeType: S
-      KeySchema:
-        - AttributeName: LockID
-          KeyType: HASH
+      AttributeDefinitions: [ { AttributeName: LockID, AttributeType: S } ]
+      KeySchema: [ { AttributeName: LockID, KeyType: HASH } ]
 
   GitHubDeployRole:
     Type: AWS::IAM::Role
@@ -67,23 +59,17 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Principal:
-              Federated: !Ref GitHubOIDCProvider
+            Principal: { Federated: !Ref GitHubOIDCProvider }
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
-              StringEquals:
-                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringEquals: { token.actions.githubusercontent.com:aud: sts.amazonaws.com }
               ForAnyValue:StringLike:
                 token.actions.githubusercontent.com:sub:
                   - !Sub repo:${GitHubOrg}/${RepoName}:ref:refs/heads/${BranchName}
                   - !Sub repo:${GitHubOrg}/${RepoName}:pull_request
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AdministratorAccess
+      ManagedPolicyArns: [ arn:aws:iam::aws:policy/AdministratorAccess ]
 
 Outputs:
-  DeployRoleArn:
-    Value: !GetAtt GitHubDeployRole.Arn
-  TfStateBucketOut:
-    Value: !Ref TfStateBucket
-  TfStateLockTableOut:
-    Value: !Ref TfStateLockTable
+  DeployRoleArn:       { Value: !GetAtt GitHubDeployRole.Arn }
+  TfStateBucketOut:    { Value: !Ref TfStateBucket }
+  TfStateLockTableOut: { Value: !Ref TfStateLockTable }
