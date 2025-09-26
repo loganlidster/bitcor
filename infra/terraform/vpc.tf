@@ -15,7 +15,9 @@ locals {
   private_cidrs = ["10.0.101.0/24", "10.0.102.0/24"]
 }
 
-# VPC
+# -----------------
+# VPC + IGW
+# -----------------
 resource "aws_vpc" "main" {
   cidr_block           = local.vpc_cidr
   enable_dns_support   = true
@@ -28,7 +30,6 @@ resource "aws_vpc" "main" {
   }
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
@@ -39,7 +40,9 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
-# Public subnets (2)
+# -----------------
+# Subnets
+# -----------------
 resource "aws_subnet" "public" {
   count = 2
 
@@ -56,7 +59,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Private subnets (2)
 resource "aws_subnet" "private" {
   count = 2
 
@@ -72,7 +74,9 @@ resource "aws_subnet" "private" {
   }
 }
 
-# One EIP for single NAT (cost-aware)
+# -----------------
+# NAT (single NAT for cost)
+# -----------------
 resource "aws_eip" "nat" {
   domain = "vpc"
 
@@ -83,7 +87,6 @@ resource "aws_eip" "nat" {
   }
 }
 
-# NAT Gateway in first public subnet
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
@@ -96,7 +99,9 @@ resource "aws_nat_gateway" "nat" {
   }
 }
 
-# Public route table -> IGW
+# -----------------
+# Route tables
+# -----------------
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -112,14 +117,12 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Associate public subnets with public RT
 resource "aws_route_table_association" "public_assoc" {
   count          = 2
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-# Private route table -> NAT
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
@@ -135,18 +138,15 @@ resource "aws_route_table" "private" {
   }
 }
 
-# Associate private subnets with private RT
 resource "aws_route_table_association" "private_assoc" {
   count          = 2
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
 
-#########################
+# -----------------
 # Security Groups
-#########################
-
-# ALB: allow 80/443 from anywhere
+# -----------------
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
   description = "ALB ingress 80/443 from Internet"
@@ -183,7 +183,6 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# ECS: allow port 8080 from ALB only
 resource "aws_security_group" "ecs_sg" {
   name        = "${var.project_name}-ecs-sg"
   description = "ECS ingress 8080 from ALB"
@@ -212,7 +211,6 @@ resource "aws_security_group" "ecs_sg" {
   }
 }
 
-# RDS: allow Postgres from ECS only
 resource "aws_security_group" "rds_sg" {
   name        = "${var.project_name}-rds-sg"
   description = "RDS ingress 5432 from ECS"
@@ -241,10 +239,9 @@ resource "aws_security_group" "rds_sg" {
   }
 }
 
-#########################
+# -----------------
 # Outputs
-#########################
-
+# -----------------
 output "vpc_id" {
   value = aws_vpc.main.id
 }
