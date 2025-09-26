@@ -12,16 +12,16 @@ variable "aws_region" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix  = var.project_name
   cluster_name = "bitcor-cluster"
-  api_name     = "${local.name_prefix}-api"
-  engine_name  = "${local.name_prefix}-engine"
+  api_name     = "${var.project_name}-api"
+  engine_name  = "${var.project_name}-engine"
   api_port     = 8080
 
   ecr_registry = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
   api_image    = "${local.ecr_registry}/v7-api:latest"
   engine_image = "${local.ecr_registry}/v7-engine:latest"
 }
+
 
 ####################
 # IAM Roles
