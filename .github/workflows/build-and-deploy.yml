@@ -1,0 +1,59 @@
+name: build-and-deploy
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ main ]
+    paths:
+      - 'services/**'
+      - '.github/workflows/build-and-deploy.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_REGION:     ${{ vars.AWS_REGION }}
+  ECR_REGISTRY:   ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  API_REPO:       v7-api
+  ENGINE_REPO:    v7-engine
+  IMAGE_TAG:      latest
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push API image
+        if: hashFiles('services/api/**') != ''
+        working-directory: services/api
+        run: |
+          docker build -t $ECR_REGISTRY/$API_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$API_REPO:$IMAGE_TAG
+
+      - name: Build & Push Engine image
+        if: hashFiles('services/engine/**') != ''
+        working-directory: services/engine
+        run: |
+          docker build -t $ECR_REGISTRY/$ENGINE_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ENGINE_REPO:$IMAGE_TAG
+
+      - name: Force new deployment (API)
+        run: |
+          aws ecs update-service             --cluster bitcor-cluster             --service bitcor-api-svc             --force-new-deployment             --region $AWS_REGION
+
+      - name: Force new deployment (Engine)
+        run: |
+          aws ecs update-service             --cluster bitcor-cluster             --service bitcor-engine-svc             --force-new-deployment             --region $AWS_REGION
